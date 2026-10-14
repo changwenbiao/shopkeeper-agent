@@ -8,6 +8,7 @@ Embedding 客户端管理器
 import asyncio
 from typing import Optional
 
+from huggingface_hub import AsyncInferenceClient, InferenceClient
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
 
 from app.conf.app_config import EmbeddingConfig, app_config
@@ -26,7 +27,11 @@ class EmbeddingClientManager:
 
     def init(self):
         """显式初始化客户端，避免模块导入时立即建立外部连接"""
-        self.client = HuggingFaceEndpointEmbeddings(model=self._get_url())
+        # LangChain 的 model 参数使用模型 ID，本地 TEI 地址交给底层推理客户端。
+        self.client = HuggingFaceEndpointEmbeddings(model=self.config.model)
+        endpoint_url = f"{self._get_url()}/embed"
+        self.client.client = InferenceClient(model=endpoint_url)
+        self.client.async_client = AsyncInferenceClient(model=endpoint_url)
 
 
 # 模块级单例，供整个项目复用同一套 Embedding 客户端管理器
