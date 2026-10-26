@@ -93,8 +93,8 @@ class MetaKnowledgeService:
                 column_infos.append(column_info)
 
         async with self.meta_mysql_repository.session.begin():
-            self.meta_mysql_repository.save_table_infos(table_infos)
-            self.meta_mysql_repository.save_column_infos(column_infos)
+            await self.meta_mysql_repository.save_table_infos(table_infos)
+            await self.meta_mysql_repository.save_column_infos(column_infos)
 
         return column_infos
 
@@ -134,7 +134,7 @@ class MetaKnowledgeService:
         # 这样更容易控制单次请求大小
         embeddings: list[list[float]] = []
         embedding_texts = [point["embedding_text"] for point in points]
-        embedding_batch_size = 20
+        embedding_batch_size = 4
         for i in range(0, len(embedding_texts), embedding_batch_size):
             batch_embedding_texts = embedding_texts[i : i + embedding_batch_size]
             batch_embeddings = await self.embedding_client.aembed_documents(
@@ -205,8 +205,8 @@ class MetaKnowledgeService:
 
         # 指标本身和字段关系要放在同一笔事务里，避免只写入其中一部分
         async with self.meta_mysql_repository.session.begin():
-            self.meta_mysql_repository.save_metric_infos(metric_infos)
-            self.meta_mysql_repository.save_column_metrics(column_metrics)
+            await self.meta_mysql_repository.save_metric_infos(metric_infos)
+            await self.meta_mysql_repository.save_column_metrics(column_metrics)
 
         return metric_infos
 
@@ -246,7 +246,7 @@ class MetaKnowledgeService:
         # 返回的 embeddings 要继续和前面的 id payload 按顺序对齐
         embeddings: list[list[float]] = []
         embedding_texts = [point["embedding_text"] for point in points]
-        embedding_batch_size = 20
+        embedding_batch_size = 4
         for i in range(0, len(embedding_texts), embedding_batch_size):
             batch_embedding_texts = embedding_texts[i : i + embedding_batch_size]
             batch_embeddings = await self.embedding_client.aembed_documents(

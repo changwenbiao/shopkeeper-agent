@@ -9,6 +9,7 @@ Repository 自身只关心“如何写入”，而“哪些写操作要放在同
 """
 
 from sqlalchemy import select
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.entities.column_info import ColumnInfo
@@ -29,32 +30,67 @@ class MetaMySQLRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    def save_table_infos(self, table_infos: list[TableInfo]):
+    async def save_table_infos(self, table_infos: list[TableInfo]):
         """批量保存表元数据。输入仍然是业务实体，而不是 ORM 模型"""
-        self.session.add_all(
+        await self._upsert(
             [TableInfoMapper.to_model(table_info) for table_info in table_infos]
         )
 
-    def save_column_infos(self, column_infos: list[ColumnInfo]):
+    async def save_column_infos(self, column_infos: list[ColumnInfo]):
         """批量保存字段元数据。实体到模型的转换统一通过 Mapper 完成"""
-        self.session.add_all(
+        await self._upsert(
             [ColumnInfoMapper.to_model(column_info) for column_info in column_infos]
         )
 
-    def save_metric_infos(self, metric_infos: list[MetricInfo]):
+    async def save_metric_infos(self, metric_infos: list[MetricInfo]):
         """批量保存指标元数据。指标本身和字段关联关系分开写入"""
-        self.session.add_all(
+        await self._upsert(
             [MetricInfoMapper.to_model(metric_info) for metric_info in metric_infos]
         )
 
-    def save_column_metrics(self, column_metrics: list[ColumnMetric]):
+    async def save_column_metrics(self, column_metrics: list[ColumnMetric]):
         """批量保存字段与指标的关联关系"""
-        self.session.add_all(
+        await self._upsert(
             [
                 ColumnMetricMapper.to_model(column_metric)
                 for column_metric in column_metrics
             ]
         )
+
+    async def _upsert(self, models: list):
+        """按主键做幂等写入，保证构建脚本可以重复执行
+
+        直接 add_all 是纯 INSERT，主键（如表名、表名.字段名）重复时会抛 1062
+        这里改成 MySQL 的 INSERT ... ON DUPLICATE KEY UPDATE：
+        已存在的行更新非主键字段，不存在则插入
+        只有联合主键、没有可更新字段的关系表，用主键做空更新跳过重复行
+        """
+        if not models:
+            return
+
+        table = models[0].__table__
+        rows = [
+            {column.key: getattr(model, column.key) for column in table.columns}
+            for model in models
+        ]
+        stmt = mysql_insert(table).values(rows)
+
+        pk_names = {column.name for column in table.primary_key.columns}
+        update_fields = {
+            column.name: stmt.inserted[column.name]
+            for column in table.columns
+            if column.name not in pk_names
+        }
+
+        if update_fields:
+            await self.session.execute(stmt.on_duplicate_key_update(**update_fields))
+        else:
+            # 只有联合主键的关系表没有可更新字段，用主键做一次空更新即可跳过重复行
+            # 比起 INSERT IGNORE，这样不会往 MySQL 里写 1062 警告日志
+            pk_name = next(iter(pk_names))
+            await self.session.execute(
+                stmt.on_duplicate_key_update(**{pk_name: stmt.inserted[pk_name]})
+            )
 
     async def get_column_info_by_id(self, id: str) -> ColumnInfo | None:
         """按字段 id 查询字段元数据，供召回信息合并阶段补齐字段上下文"""

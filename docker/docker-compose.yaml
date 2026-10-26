@@ -55,11 +55,11 @@ services:
     ports:
       - "8081:80"
     environment:
-      MODEL_ID: /models/bge-large-zh-v1.5
-      MAX_CONCURRENT_REQUESTS: "16"
-      MAX_BATCH_TOKENS: "16384"
+      MODEL_ID: /models/bge-small-zh-v1.5
+      MAX_CONCURRENT_REQUESTS: "32"
+      MAX_BATCH_TOKENS: "2048"
     volumes:
-      - ./embedding/bge-large-zh-v1.5:/models/bge-large-zh-v1.5
+      - ./embedding/bge-small-zh-v1.5:/models/bge-small-zh-v1.5
 
 volumes:
   mysql_data:

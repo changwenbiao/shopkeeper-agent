@@ -26,12 +26,12 @@ db_dw:
 qdrant:
   host: localhost
   port: 6333
-  embedding_size: 1024
+  embedding_size: 512
 
 embedding:
   host: localhost
   port: 8081
-  model: BAAI/bge-large-zh-v1.5
+  model: BAAI/bge-small-zh-v1.5
 
 es:
   host: localhost
@@ -39,6 +39,6 @@ es:
   index_name: data_agent
 
 llm:
-  model_name: Pro/zai-org/GLM-5.1
+  model_name: GLM-5.3-Flash
   api_key: ${oc.env:LLM_API_KEY}
-  base_url: https://api.siliconflow.cn/v1
+  base_url: https://open.bigmodel.cn/api/paas/v4
