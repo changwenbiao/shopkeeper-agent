@@ -14,6 +14,7 @@ from app.agent.context import DataAgentContext
 from app.agent.llm import llm
 from app.agent.state import DataAgentState
 from app.core.log import logger
+from app.core.sql import clean_sql
 from app.prompt.prompt_loader import load_prompt
 
 
@@ -60,6 +61,8 @@ async def generate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]
                 "query": query,
             }
         )
+        # 模型可能无视提示词仍输出 ```sql 代码块，先清理再交给校验和执行节点
+        # result = clean_sql(result)
         logger.info(f"生成的SQL：{result}")
         writer({"type": "progress", "step": step, "status": "success"})
         return {"sql": result}

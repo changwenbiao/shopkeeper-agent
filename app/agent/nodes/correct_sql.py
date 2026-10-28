@@ -14,6 +14,7 @@ from app.agent.context import DataAgentContext
 from app.agent.llm import llm
 from app.agent.state import DataAgentState
 from app.core.log import logger
+from app.core.sql import clean_sql
 from app.prompt.prompt_loader import load_prompt
 
 
@@ -70,6 +71,8 @@ async def correct_sql(state: DataAgentState, runtime: Runtime[DataAgentContext])
         )
 
         logger.info(f"校正后的SQL：{result}")
+        # 校正节点之后直接进入执行节点，中间不再校验，必须在这里剥离代码块围栏
+        # result = clean_sql(result)
         writer({"type": "progress", "step": step, "status": "success"})
         return {"sql": result}
     except Exception as e:

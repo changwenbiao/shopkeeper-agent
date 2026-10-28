@@ -5,6 +5,7 @@
 当前链路已经落地关键词抽取和多路召回，字段和指标走 Qdrant 向量检索，字段取值走 ES 全文检索
 整体流程先抽取用户问题关键词，再并行召回字段 字段取值和指标信息，
 随后合并召回结果 过滤候选表和指标 补充额外上下文，最后生成 校验 修正并执行 SQL
+图结构保留扇出以提高召回效率，实际并发度由调用方传入的 max_concurrency 配置控制
 """
 
 import asyncio
@@ -60,6 +61,7 @@ graph_builder.add_node("run_sql", run_sql)
 graph_builder.add_edge(START, "extract_keywords")
 
 # 关键词抽取后并行进入三类召回，分别面向字段 字段值和业务指标
+# 图结构保留扇出，实际是否并发由执行时的 max_concurrency 配置决定
 graph_builder.add_edge("extract_keywords", "recall_column")
 graph_builder.add_edge("extract_keywords", "recall_value")
 graph_builder.add_edge("extract_keywords", "recall_metric")
@@ -134,8 +136,12 @@ if __name__ == "__main__":
             )
 
             # stream_mode="custom" 会接收各节点通过 runtime.stream_writer 写出的进度信息
+            # 与线上入口保持一致，这里同样限制为串行执行
             async for chunk in graph.astream(
-                input=state, context=context, stream_mode="custom"
+                input=state,
+                context=context,
+                stream_mode="custom",
+                config={"max_concurrency": 1},
             ):
                 print(chunk)
 

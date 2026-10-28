@@ -58,8 +58,12 @@ class QueryService:
         )
         try:
             # stream_mode="custom" 对应节点内部 writer(...) 写出的进度消息
+            # max_concurrency=1 让扇出节点逐个执行，图结构不变但不会并发
             async for chunk in graph.astream(
-                input=state, context=context, stream_mode="custom"
+                input=state,
+                context=context,
+                stream_mode="custom",
+                config={"max_concurrency": 1},
             ):
                 # SSE 要求每条消息以 data: 开头，并以两个换行符结束
                 # ensure_ascii=False 保留中文进度文案，default=str 兜底处理日期等非 JSON 类型
